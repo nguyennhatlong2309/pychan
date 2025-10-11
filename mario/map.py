@@ -10,8 +10,6 @@ def map1():
     for x in range(0,10):
         terrrain_group.add(ga.floor(50,100,450-(x*32)))
 
-  
-
     return terrrain_group
 
 

@@ -2,7 +2,7 @@ from PIL import Image
 import os
 
 # Mở ảnh động
-img = Image.open("images/Goomba.gif")
+img = Image.open("images/greenKoopaParatroopa.gif")
 
 # Tạo thư mục lưu frame
 os.makedirs("frames", exist_ok=True)
@@ -11,7 +11,7 @@ os.makedirs("frames", exist_ok=True)
 frame = 0
 while True:
     img.seek(frame)
-    img.save(f"images/Goomba_frame_{frame}.png")
+    img.save(f"images/greenKoopaParatroopa{frame}.png")
     frame += 1
     try:
         img.seek(frame)
