@@ -1,11 +1,15 @@
 from PIL import Image as img
 
-i1 = img.open("images/greenKoopaParatroopa0.png")
-i2= img.open("images/greenKoopaParatroopa1.png")
+i1 = img.open("images/Hammer0.gif")
+i2 = i1.rotate(-90, expand=True)
+i3 = i2.rotate(-90, expand=True)
+i4 = i3.rotate(-90, expand=True)
 
-i3 = i1.transpose(img.FLIP_LEFT_RIGHT)
-i4 = i2.transpose(img.FLIP_LEFT_RIGHT)
+i2.save("images/Hammer1.gif")
+i3.save("images/Hammer2.gif")
+i4.save("images/Hammer3.gif")
 
 
-i3.save("images/greenKoopaParatroopa2.png")
-i4.save("images/greenKoopaParatroopa3.png")
+
+
+

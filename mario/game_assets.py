@@ -13,19 +13,23 @@ class object(pg.sprite.Sprite):
         self.lose = False
         self.on_ground = False
         
-
+    
+    
 
 
 class enemy(object):
     def __init__(self, image, x, y):
         super().__init__(image,x,y)
         self.status = 1
+    def update(self):
+        return  
 
 class floor(object):
     def __init__(self,width,x, y):
         image = pg.image.load("images/grounds.png").subsurface(pg.Rect(0,0,width,32))
         super().__init__(image, x, y)
-
+    def update(self):
+        return  
 class brick(object):
     def __init__(self,x, y):
         image = pg.image.load("images/brick.gif")
@@ -33,8 +37,7 @@ class brick(object):
         y*=32
         super().__init__(image,x,y)
 
-
-class goomba(enemy):
+class goomba(enemy): # ok
     def __init__(self, x, y,object_group):
         self.frame = [pg.image.load("images/Goomba_frame_0.png"),pg.image.load("images/Goomba_frame_1.png")]
         super().__init__(self.frame[0], x, y)
@@ -80,9 +83,18 @@ class goomba(enemy):
             self.animation()
             self.move()
         fall(self)
-            
 
-class koopatroopa(enemy):
+class hit_box(object):
+    def __init__(self, image, x, y,object_group):
+        super().__init__(image, x, y)
+        self.object_group = object_group
+    def checkcollide(self):
+        for object in self.object_group:
+            if isinstance(object,Mario):
+                if self.rect.colliderect(object):
+                    over(object)
+
+class koopatroopa(enemy): # ok 
     def __init__(self, x, y,object_group):
         self.frame = [pg.image.load("images/greenKoopaParatroopa0.png"),
                     pg.image.load("images/greenKoopaParatroopa1.png"),
@@ -105,25 +117,7 @@ class koopatroopa(enemy):
         self.rect.x += self.direct * self.velocity_x
 
             
-
-    def update(self):
-        if self.status == 4 :
-            self.time +=1
-            if self.time >= 70 :
-                self.time = 0
-            
-            self.image = self.frame[int(self.time/35+3)*self.direct +4]
-        elif self.status == 3:
-            self.time +=1
-            if self.time >= 70:
-                self.time = 0
-            self.image = self.frame[int(self.time/35+1)*self.direct+4]
-        else : 
-            self.image = self.frame[4]
-            self.rect = self.image.get_rect(bottomleft=self.rect.bottomleft)
-            self.velocity_x = 5 if self.status == 1 else 0
-            
-                 
+    def checkcollide(self):
         if not self.lose:  # update vi tri cua rua xanh 
             for object in self.object_group :
                 if self.rect.colliderect(object) and object is not self:
@@ -156,16 +150,123 @@ class koopatroopa(enemy):
                     if (left_to(self,object) or right_to(self,object)) and not isinstance(object,Mario):
                         self.direct *= -1
                         self.rect.x += self.direct
-
+    def update(self):
+        if self.status == 4 :
+            self.time +=1
+            if self.time >= 70 :
+                self.time = 0
             
+            self.image = self.frame[int(self.time/35+3)*self.direct +4]
+        elif self.status == 3:
+            self.time +=1
+            if self.time >= 70:
+                self.time = 0
+            self.image = self.frame[int(self.time/35+1)*self.direct+4]
+        else : 
+            self.image = self.frame[4]
+            self.rect = self.image.get_rect(bottomleft=self.rect.bottomleft)
+            self.velocity_x = 5 if self.status == 1 else 0
+            
+                 
+        
+
+        self.checkcollide()           
         self.move_x()
         fall(self)
 
 
-class greenKoopaParatroppa(enemy):
-    def __init__(self, image, x, y):
-        self.status = 3
-        super().__init__(image, x, y)
+class hammerBrother(enemy):
+    def __init__(self, x, y,object_group):
+        self.frame = [pg.image.load("images/Hammer Brother - Throw1.gif"),
+                      pg.image.load("images/Hammer Brother - Throw2.gif"),
+                      pg.image.load("images/Hammer Brother.gif")]
+        super().__init__(self.frame[2],x,y)
+        self.object_group = object_group
+        self.time = 0
+        self.status = 2 
+        self.default_x = x
+        self.velocity_x = 1
+        self.d = 1
+        self.count_down = 0
+        self.count_down_hammer = 0
+        
+    def move_x(self):
+        if abs(self.rect.x - self.default_x) > 200 :
+            self.direct *= -1
+        self.rect.x += self.velocity_x * self.direct
+
+    def jump(self):
+        self.velocity_y =-8 
+        self.on_ground = False
+    def checkcollide(self):
+        for object in self.object_group :
+            if self.rect.colliderect(object) and object is not self :
+                if isinstance(object,floor):
+                    if top_to(self,object):
+                        self.on_ground = True
+                        self.velocity_y = 0
+                        self.rect.bottom = object.rect.top
+                        self.edge_left = object.rect.left 
+                        self.edge_right = object.rect.right
+
+
+    def animation(self):
+        self.count_down +=1
+        self.time += 1
+        if self.time >=20:
+            self.time = 0
+            
+        self.image = self.frame[int(self.time/10)+self.d]
+        if self.count_down == 100 :
+            self.count_down = 0
+            self.d = 0 if self.d == 1 else 1
+            self.jump()
+        
+    def throw(self):
+        self.count_down_hammer += 1
+        if self.count_down_hammer >= 100 :
+            self.count_down_hammer = 0
+            Hammer = hammer(self.rect.x,self.rect.y,self.object_group)
+            self.object_group.add(Hammer)
+        
+
+            
+        
+    def update(self):
+        self.throw()
+        self.animation()
+        self.checkcollide()
+        self.move_x()
+        fall(self)
+        
+class hammer(hit_box): # ok 
+    def __init__(self, x, y, object_group):
+        self.frame =[pg.image.load("images/Hammer0.gif"),
+                     pg.image.load("images/Hammer1.gif"),
+                     pg.image.load("images/Hammer2.gif"),
+                     pg.image.load("images/Hammer3.gif")]
+        super().__init__(self.frame[0], x, y, object_group)
+        self.velocity_y = -5
+        self.velocity_x = -2 
+        self.time = 0
+    
+
+    def animation(self):
+        self.time += 1 
+        if self.time >= 40 :
+            self.time = 0
+        self.image = self.frame[int(self.time/10)]
+    
+    def update(self):
+        super().checkcollide()
+        self.animation()
+        self.rect.x += self.velocity_x
+        if self.rect.y > 600 : 
+            self.kill()
+        fall(self)
+
+
+
 
 class Mario(object):
     

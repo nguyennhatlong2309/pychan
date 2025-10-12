@@ -16,12 +16,12 @@ clock = pg.time.Clock()
 terrain = ga.floor(2000,0,632)
 
 mario = ga.Mario(150,200,object_group)
-t = ga.floor(50,200,250)
+t = ga.floor(200,300,500)
 t1 = ga.floor(50,70,600)
 t2 = ga.floor(50,300,600)
 t3 = ga.floor(50,600,600)
 t4 = ga.floor(50,300,568)
-enemy = ga.koopatroopa(450,550,object_group)
+enemy = ga.hammerBrother(450,550,object_group)
 
 
 object_group.add(terrain)
@@ -47,14 +47,16 @@ while running:
 
     
     
-    enemy.update()
+    
     mario.update(pg.key.get_pressed())
 
     screen.blit(bg, (0, 0))
     
     for x in object_group:
+        if not isinstance(x,ga.Mario):
+            x.update()
         screen.blit(x.image, x.rect)
-        pg.draw.rect(screen,(255,0,0),x.rect,2)   
+        # pg.draw.rect(screen,(255,0,0),x.rect,2)   
     screen.blit(mario.image,mario.rect)
     
     
