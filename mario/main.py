@@ -13,20 +13,20 @@ clock = pg.time.Clock()
 
 
 
-terrain = ga.floor(2000,0,632)
+terrain = ga.floor(1100,0,632,object_group)
 
-mario = ga.Mario(150,200,object_group)
-t = ga.floor(200,300,500)
-t1 = ga.floor(50,70,600)
-t2 = ga.floor(50,300,600)
-t3 = ga.floor(50,600,600)
-t4 = ga.floor(50,300,568)
-enemy = ga.hammerBrother(450,550,object_group)
+mario = ga.Mario(450,200,object_group)
+# t = ga.floor(200,300,500,object_group)
+t1 = ga.floor(50,70,600,object_group)
+# t2 = ga.floor(50,300,600,object_group)
+t3 = ga.floor(50,600,600,object_group)
+# t4 = ga.floor(50,300,568,object_group)
+enemy = ga.latiku(310,200,object_group)
 
 
-object_group.add(terrain)
 
-object_group.add(t,t1,t2,t3,t4,enemy,mario)
+
+
 
 
 running = True
@@ -34,19 +34,12 @@ while running:
     for event in pg.event.get():
         if event.type == pg.QUIT :
             running = False
-            pg.quit()
+            pg .quit()
             exit()  
 
     
     mario.current_time = pg.time.get_ticks()
     mario.are_going = False
-    
-    
-
-        
-
-    
-    
     
     mario.update(pg.key.get_pressed())
 
