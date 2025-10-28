@@ -1,6 +1,28 @@
 import pygame as pg
+from PIL import Image, ImageDraw, ImageFont
+pg.init()
+y_floor = 32*14
 
-y_floor = 32*19
+font = pg.font.Font("fonts/PressStart2P-Regular (1).ttf", 16)
+
+class TextEntity(pg.sprite.Sprite) :
+    def __init__(self, text,x,y,object_group):
+        super().__init__()
+        color = (255,255,255)
+        self.font = font 
+        self.image = self.font.render(text,True,color)
+        self.rect = self.image.get_rect(center = (x,y))
+        self.lifetime = 30
+        object_group.add(self)
+        self.velocity_y = 0
+        self.velocity_x = 0
+
+    def update(self):
+        self.rect.y -=1
+        self.lifetime -=1
+        if self.lifetime <= 0:
+            self.kill()
+
 class object(pg.sprite.Sprite):
     def __init__(self,image,x,y,object_group):
         super().__init__()
@@ -15,7 +37,18 @@ class object(pg.sprite.Sprite):
         self.lose = False
         self.on_ground = False
         self.object_group = object_group
-        self.object_group.add(self)
+        self.object_group.add(self)  
+
+class bg(object):
+    def __init__(self, name_img, x, y, object_group):
+        self.image = pg.image.load(f"images/{name_img}.png")
+        super().__init__(self.image, x, y, object_group)
+        
+    def update(self):
+        for object in self.object_group :
+            if isinstance(object,Mario):
+                if object.rect.x > self.rect.right +800 : 
+                    self.rect.left = self.rect.right +self.image.get_width()
 
 class castle(object):
     def __init__(self, x, object_group):
@@ -29,19 +62,160 @@ class gold_flag(object):
         y = y_floor-self.image.get_height()
         super().__init__(self.image, x, y, object_group)        
 
-class enemy(object):
-    def __init__(self, image, x, y,object_group):
-        super().__init__(image,x,y,object_group)
-        self.status = 1
-    def update(self):
-        return  
+class column_grass(object):
+    def __init__(self, x, y,type, object_group):
+        if type == 1:  
+            image = pg.image.load("images/column1.png")
+        elif type == 2:
+            image = pg.image.load("images/column2.png")
+        elif type == 3:
+            image = pg.image.load("images/column3.png")
 
-class floor(object):
+        super().__init__(image, x, y, object_group)
+        self.rect.centerx = x
+
+class terrain(object):
+    def __init__(self, image, x, y, object_group):
+        super().__init__(image, x, y, object_group)
+
+class moving_flat(terrain):
+    def __init__(self, x, y,type,axes,direct, object_group):
+        if type == 1:
+            image = pg.image.load("images/MovingPlatform1.png")
+        if type == 2:
+            image = pg.image.load("images/MovingPlatform2.png")
+        if type == 3:
+            image = pg.image.load("images/MovingPlatform3.png")
+        super().__init__(image, x, y, object_group)
+
+        self.axes = axes
+        self.direct = direct
+        self.direct_y = -1
+        self.default_x = x 
+        self.default_y = y
+        self.are_check_mario_on = True
+        self.limit_possion_x = 96
+        self.limit_possion_y = 128
+
+    def move(self):
+        if self.axes == 1 :
+            self.velocity_x += self.direct*0.1
+            
+            if self.velocity_x >= 1 :
+                self.velocity_x = 1
+            elif self.velocity_x <= -1 :
+                self.velocity_x = -1
+            self.rect.x += self.velocity_x
+            
+            if self.are_check_mario_on:
+                for object in self.object_group :
+                    
+                    if isinstance(object,Mario) :
+                        if self.check_mario_on(object) :
+                            object.rect.x+= self.velocity_x
+                            object.edge_left+=self.velocity_x
+                            object.edge_right+=self.velocity_x
+                    
+                    self.checkcollide()                      
+
+        elif self.axes == 2 :
+            self.velocity_y += self.direct*0.1
+
+            if self.velocity_y >= 1:
+                self.velocity_y =1 
+            elif self.velocity_y <= -1:
+                self.velocity_y = -1
+            self.rect.y += self.velocity_y
+
+            if self.are_check_mario_on:
+                for object in self.object_group :
+                    if isinstance(object,Mario) and self.check_mario_on(object):
+                       object.rect.bottom = self.rect.top
+
+
+    def check_mario_on(self,object):
+        if self.axes == 1 :
+            if object.rect.bottom == self.rect.top and ((object.rect.right < self.rect.right and object.rect.right > self.rect.left) or (object.rect.left > self.rect.left and object.rect.left < self.rect.right)):
+                return True
+            return False
+        elif self.axes == 2:
+            if abs(object.rect.bottom - self.rect.top) <=2 and object.velocity_y == 0 and ((object.rect.right < self.rect.right and object.rect.right > self.rect.left) or (object.rect.left > self.rect.left and object.rect.left < self.rect.right)):
+                return True
+            return False
+        return False
+
+    def checkcollide(self):
+        if self.axes == 1 :
+            if self.rect.x < self.default_x -self.limit_possion_x :
+                self.direct = 1
+            elif self.rect.x > self.default_x +self.limit_possion_x:
+                self.direct = -1
+
+            for object in self.object_group :
+                if isinstance(object,Mario):
+                    object.being_pushed = False
+                    if self.rect.colliderect(object.rect) :
+                        
+                        if left_to(self,object):
+                            object.rect.left = self.rect.right+(object.velocity_x*object.direct)
+                            object.being_pushed = True
+                        elif right_to(self,object):
+                            object.rect.right = self.rect.left+(object.velocity_x*object.direct)               
+
+        elif self.axes == 2 :
+            if self.rect.y < self.default_y -self.limit_possion_y :
+                self.direct = 1
+            elif self.rect.y > self.default_y +self.limit_possion_y:
+                self.direct = -1
+
+            for object in self.object_group : 
+                if self.rect.colliderect(object.rect) and isinstance(object,Mario):
+                    if bot_to(self,object):
+                        object.rect.bottom = self.rect.top
+              
+    def update(self):
+        self.checkcollide()
+        self.move()
+        
+class floor(terrain):
     def __init__(self,width,x, y,object_group):
-        image = pg.image.load("images/grounds.png").subsurface(pg.Rect(0,0,width,32))
+        image = pg.image.load("images/ground.png").subsurface(pg.Rect(0,0,width,32))
         super().__init__(image, x, y,object_group)
     def update(self):
         return  
+
+class floor_underground(terrain):
+    def __init__(self,width,x, y,object_group):
+        image = pg.image.load("images/floor_underground.png").subsurface(pg.Rect(0,0,width,32))
+        super().__init__(image, x, y,object_group)
+    def update(self):
+        return 
+
+class grass_terrace(terrain):
+    def __init__(self, x, y, type, object_group):
+        if type == 1 :
+            image = pg.image.load("images/grass_terrace3.png").subsurface(pg.Rect(0,0,96,32))
+        elif type == 2 : 
+            image = pg.image.load("images/grass_terrace4.png").subsurface(pg.Rect(0,0,128,32))
+        elif type == 3 :
+            image = pg.image.load("images/grass_terrace6.png").subsurface(pg.Rect(0,0,192,32))
+        elif type == 4 :
+            image = pg.image.load("images/grass_terrace8.png").subsurface(pg.Rect(0,0,256,32))
+        
+        super().__init__(image, x, y, object_group)
+        if type == 1 :
+            column_grass(self.rect.centerx,self.rect.y,1,self.object_group)
+        elif type == 2 :
+            column_grass(self.rect.centerx,self.rect.y,2,self.object_group)
+        elif type == 3 :
+            column_grass(self.rect.centerx,self.rect.y,2,self.object_group)
+        elif type == 4 :
+            column_grass(self.rect.centerx,self.rect.y,3,self.object_group)
+        
+        self.object_group.remove(self)
+        self.object_group.add(self)
+    def update(self):
+        return 
 
 class peace_brick(object):
     def __init__(self, x, y,direct,object_group):
@@ -75,6 +249,8 @@ class brick(floor):
         x*=32
         y*=32
         super().__init__(32,x,y,object_group)
+        self.image = pg.image.load("images/brick.gif")
+
         self.default_y = y 
         self.on_ground = True
     def pop_up(self):
@@ -108,7 +284,8 @@ class pipe(floor):
         type -=1
         self.frame =[pg.image.load("images/pipe0.png"),
                      pg.image.load("images/pipe1.png"),
-                     pg.image.load("images/pipe2.png")]
+                     pg.image.load("images/pipe2.png"),
+                     pg.image.load("images/pipe3.png")]
         width = self.frame[type].get_width()
         y = y_floor-(self.frame[type].get_height())
         super().__init__(width, x, y,object_group)
@@ -140,6 +317,34 @@ class coin(object):
         self.animation()
         fall(self)
 
+class static_coin(object):
+    def __init__(self, x, y, object_group):
+        self.frame = [pg.image.load("images/static_coin0.png"),
+                      pg.image.load("images/static_coin1.png"),
+                      pg.image.load("images/static_coin2.png"),
+                      pg.image.load("images/static_coin3.png"),
+                      pg.image.load("images/static_coin4.png"),]
+        super().__init__( self.frame[0],x, y, object_group)
+        self.time = 0
+
+    def animaion(self):
+        self.time += 1
+        if self.time >= 35 :
+            self.time = 0
+        self.image = self.frame[int(self.time/7)]
+        
+    def checkcollide(self):
+        for object in self.object_group:
+            if isinstance(object,Mario) :
+                if self.rect.colliderect(object.rect):
+                    self.kill()
+                
+                break
+    
+    def update(self):
+        self.animaion()
+        self.checkcollide()                
+
 class super_mushroom(object):
     def __init__(self,parent, object_group):
         self.frame = pg.image.load("images/Super Mushroom.png")
@@ -149,12 +354,13 @@ class super_mushroom(object):
         self.rect.centerx = parent.rect.centerx
         self.parent = parent
     def move_x(self):
-        self.rect.x += self.velocity_x*self.direct  
+        self.velocity_x = 1
+        self.rect.x += self.velocity_x*self.direct
     
     def checkcollide(self):
         for object in self.object_group :
             if self.rect.colliderect(object.rect):
-                if isinstance(object,floor) and object is not self:
+                if isinstance(object,terrain) and object is not self:
                     if top_to(self,object):
                         self.edge_left =getEdgeL(object) 
                         self.edge_right =getEdgeR(object) 
@@ -168,8 +374,10 @@ class super_mushroom(object):
                         self.on_ground = False
                         if self.rect.centerx < object.rect.centerx :
                             self.direct *= -1
+                            
                     elif left_to(self,object) or right_to(self,object):
                         self.direct*=-1
+                        self.velocity_x += self.direct
                                             
     def update(self):
         if self.start_update:
@@ -225,9 +433,11 @@ class firebar(object):
         self.limit_time = 40
         self.time = 0
         self.collideLR = False
+        self.velocity_x *=self.direct
 
     def move(self):
-        self.rect.x += self.velocity_x*self.direct
+        
+        self.rect.x += self.velocity_x
         
     def animation(self):
         try :
@@ -241,8 +451,8 @@ class firebar(object):
     
     def checkcollide(self):
         for object in self.object_group : 
-            if self.rect.colliderect(object.rect) and object is not self and not isinstance(object,firebar):
-                if isinstance(object,floor):
+            if self.rect.colliderect(object.rect) and object is not self and not isinstance(object,(firebar,Mario,bg,TextEntity)):
+                if isinstance(object,terrain):
                     if top_to(self,object):
                         self.velocity_y = -3
                     elif right_to(self,object) or left_to(self,object):
@@ -251,7 +461,7 @@ class firebar(object):
                         self.time = 0
                         self.frame = self.frame2
                         self.collideLR = True
-                if not isinstance(object,(Mario,floor)):
+                if not isinstance(object,(floor)):
                     object.status = 1
                     over(object)
                     self.velocity_y = 0
@@ -265,7 +475,7 @@ class firebar(object):
             self.checkcollide()
             self.move()
             fall(self)
-            
+        
         self.animation()
         
 class question_block(brick):
@@ -320,13 +530,28 @@ class question_block(brick):
         if not self.image == self.frame[3] :
             self.animation()
 
+class enemy(object):
+    def __init__(self, image, x, y,object_group):
+        super().__init__(image,x,y,object_group)
+        self.status = 1
+    def update(self):
+        return  
+
 class goomba(enemy):  
     def __init__(self, x, y,object_group):
-        self.frame = [pg.image.load("images/Goomba_frame_0.png"),pg.image.load("images/Goomba_frame_1.png")]
+        self.frame = [pg.image.load("images/Goomba_frame_0.png"),
+                      pg.image.load("images/Goomba_frame_1.png"),
+                      pg.image.load("images/Goomba_lose.png")]
         super().__init__(self.frame[0], x, y,object_group)
         self.time = 0
+        self.status = 1
         
-        
+    def change_image(self,img):
+        bottomleft = self.rect.bottomleft
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.bottomleft = bottomleft
+
     def over(self):
         self.on_ground = False
         self.lose = True
@@ -335,7 +560,7 @@ class goomba(enemy):
     def checkcollide(self):
         for object in self.object_group:
             if self.rect.colliderect(object.rect) and object is not self:
-                if isinstance(object,floor):
+                if isinstance(object,terrain):
                     if top_to(self,object):
                        self.edge_left = getEdgeL(object) 
                        self.edge_right = getEdgeR(object) 
@@ -345,10 +570,11 @@ class goomba(enemy):
 
                     if right_to(self,object) or left_to(self,object):
                         self.direct *= -1
-                elif not isinstance(object,(Mario,hit_box,firebar,super_mushroom)):
+                elif  isinstance(object,(enemy)):
                    if right_to(self,object) or left_to(self,object):
                        self.direct*=-1
-                       object.direct *= -1
+                       if not (isinstance(object,(koopatroopa,redkoopatroopa)) and object.status == 1):
+                        object.direct *= -1
                    
                         
                        
@@ -356,19 +582,26 @@ class goomba(enemy):
                 
 
     def animation(self):
-        self.time +=1
-        if self.time >= 20 :
-            self.time = 0
-        self.image = self.frame[int(self.time/10)]
+        if self.lose :
+            self.change_image(self.frame[2])
+        else :
+            self.time +=1
+            if self.time >= 20 :
+                self.time = 0
+            self.image = self.frame[int(self.time/10)]
+
+
     
     def move(self):
-        self.rect.x += self.velocity_x * self.direct
+        self.velocity_x = 1
+        self.velocity_x*=self.direct
+        self.rect.x += self.velocity_x
         
     def update(self):
         if not self.lose :
             self.checkcollide()
-            self.animation()
             self.move()
+        self.animation()
         fall(self)
 
 class hit_box(object): 
@@ -382,6 +615,45 @@ class hit_box(object):
                 if self.rect.colliderect(object.rect):
                     object.downGrade()
 
+class piranha_plant(hit_box):
+    def __init__(self,x,y, object_group):
+        self.frame = [pg.image.load("images/Piranha Plant0.png"),
+                      pg.image.load("images/Piranha Plant1.png"),]
+        super().__init__(self.frame[0], x,y, object_group)
+        self.rect.centerx = x
+        self.time = 0
+        self.default_y = y+10
+        self.direct_y = -1
+        self.velocity_y = 1
+        self.time_pause = 0
+        self.are_waiting = False
+    def animation(self):
+        self.time += 1
+        if self.time >= 20 :
+            self.time = 0 
+        self.image = self.frame[int(self.time/10)]
+
+    
+    def move_y(self):
+        if self.are_waiting:
+            self.time_pause += 1
+            if self.time_pause >= 60:
+                self.time_pause = 0
+                self.are_waiting = False
+                
+
+        else:
+            if abs(self.rect.y - self.default_y) > 58 :
+                self.velocity_y *=-1
+                self.rect.y += self.velocity_y
+                self.are_waiting = True
+        
+            self.rect.y += self.velocity_y
+        
+    def update(self):
+        self.animation()
+        self.move_y()
+
 class koopatroopa(enemy): # ok 
     def __init__(self, x, y,object_group):
         self.frame = [pg.image.load("images/greenKoopaParatroopa0.png"),#1
@@ -393,74 +665,117 @@ class koopatroopa(enemy): # ok
                     pg.image.load("images/greenKoopaTroopa3.png"),#7
                     pg.image.load("images/greenKoopaParatroopa2.png"),#7
                     pg.image.load("images/greenKoopaParatroopa3.png")]#8
-        super().__init__(self.frame[0], x, y,object_group)
+        super().__init__(self.frame[3], x, y,object_group)
         self.status = 3
         self.velocity_y = -1
         self.time = 0
         self.velocity_x = 1
+        self.lose = False
         
 
     def move_x(self):
-        self.rect.x += self.direct * self.velocity_x
+        if self.status == 1 :
+            self.velocity_x = 7
+        elif self.status == 2:
+            self.velocity_x = 0
+        elif self.status == 3 or self.status == 4: 
+            self.velocity_x = 1
+        self.rect.x += self.velocity_x*self.direct
+    
 
             
     def checkcollide(self):
         if not self.lose:  # update vi tri cua rua xanh 
             for object in self.object_group :
                 if self.rect.colliderect(object.rect) and object is not self:
-                    
+
                     if self.status == 1:
                         if isinstance(object,Mario):
-
                             if (left_to(self,object) or right_to(self,object)) and object.lose == False:
-                                object.status = 0
-                                over(object)
+                                if object.status > 1 :
+                                    object.downGrade()
+                                else :
+                                   over(object)
 
+                        elif isinstance(object,enemy) and not object.lose:
+                            over(object)
+
+                        elif isinstance(object,terrain):
+                            if top_to(self,object):
+                                self.velocity_y = 0
+                                self.on_ground = True
+                                self.edge_left = getEdgeL(object)
+                                self.edge_right = getEdgeR(object)
+                                self.rect.bottom = object.rect.top
+                            else : 
+                                self.direct*= -1
+                                self.rect.x += self.velocity_y*self.direct
                     elif self.status == 2:
                         if isinstance(object,Mario):
-                            self.direct = 1 if right_to(self,object) else -1
+                            if self.rect.centerx < object.rect.centerx :
+                                self.direct = -1
+                                if not top_to(object,self):
+                                    self.rect.x -= 5                                    
+                            else:
+                                self.direct = 1
+                                if not top_to(object,self):
+                                    self.rect.x += 5
+                                
+                            self.status =1 
+                               
+
+
+                    elif self.status == 3 :
+                        if isinstance(object,terrain):
+                            if top_to(self,object):
+                                self.velocity_y = 0
+                                self.on_ground = True
+                                self.edge_left = getEdgeL(object)
+                                self.edge_right = getEdgeR(object)
+                                self.rect.bottom = object.rect.top
+                            else :
+                                self.direct *= -1
+                                self.rect.x += self.velocity_x*self.direct
+                        elif isinstance(object,enemy) and not isinstance(object,hammerBrother):
+                            if left_to(self,object) or right_to(self,object):
+                                self.direct*= -1 
+                                self.rect.x += self.velocity_x*self.direct
+                                object.direct *= -1
+                                object.rect.x += self.velocity_x*self.direct
+
+
+                    elif self.status == 4 :
+                        if isinstance(object,terrain):
+                            if  top_to(self,object):
+                                self.velocity_y = -6
+                                self.on_ground = False
                         
-                    elif top_to(self,object):
-                        if self.status == 4 :
-                            self.velocity_y = -7
-                            self.on_ground = False
-                        else :
-                            self.rect.bottom = object.rect.top
+                        if isinstance(object,(terrain,enemy)) and (left_to(self,object) or right_to(self,object))  :
+                            self.direct *= -1
+                            self.rect.x += self.direct
+                        if bot_to(self,object):
+                            self.rect.top = object.rect.bottom
                             self.velocity_y = 0
-                            self.on_ground = True
-                            self.edge_left = getEdgeL(object) 
-                            self.edge_right = getEdgeR(object)
-                            self.velocity_x = 1
-                        
-                        
-                    if (left_to(self,object) or right_to(self,object)) and not isinstance(object,Mario):
-                        self.direct *= -1
-                        self.rect.x += self.direct
-                    if bot_to(self,object):
-                        self.rect.top = object.rect.bottom
-                        self.velocity_y = 0
-    def update(self):
+
+    def animation(self):
+        self.time += 1
+        if self.time >= 20:
+            self.time = 0
         if self.status == 4 :
-            self.time +=1
-            if self.time >= 20 :
-                self.time = 0
-            
             self.image = self.frame[int(self.time/10+3)*self.direct +4]
-        elif self.status == 3:
-            self.time +=1
-            if self.time >= 20:
-                self.time = 0
+            
+        elif self.status == 3 :
             self.image = self.frame[int(self.time/10+1)*self.direct+4]
-        else : 
+
+        elif self.status == 2  or self.status == 1:
             self.image = self.frame[4]
             self.rect = self.image.get_rect(bottomleft=self.rect.bottomleft)
-            self.velocity_x = 5 if self.status == 1 else 0
+    def update(self):
+        if not self.lose:
             
-                 
-        
-
-        self.checkcollide()           
-        self.move_x()
+            self.checkcollide()           
+            self.move_x()
+        self.animation()
         fall(self)
 
 class koopaParatroopa(koopatroopa): # ok
@@ -489,7 +804,8 @@ class hammerBrother(enemy):#ok
     def move_x(self):
         if abs(self.rect.x - self.default_x) > 100 :
             self.direct *= -1
-        self.rect.x += self.velocity_x * self.direct
+        self.velocity_x*=self.direct
+        self.rect.x += self.velocity_x 
 
     def jump(self):
         self.count_down_jump += 1
@@ -501,7 +817,7 @@ class hammerBrother(enemy):#ok
         if not self.lose:
             for object in self.object_group :
                 if self.rect.colliderect(object.rect) and object is not self :
-                    if isinstance(object,floor):
+                    if isinstance(object,terrain):
                         if top_to(self,object):
                             self.on_ground = True
                             self.velocity_y = 0
@@ -539,6 +855,136 @@ class hammerBrother(enemy):#ok
         self.jump()
         fall(self)
         
+class redkoopatroopa(enemy):
+    def __init__(self, x, y, object_group):
+        self.frame = [pg.image.load("images/RedKoopaTroopaL0.png"),#0
+                      pg.image.load("images/RedKoopaTroopaL1.png"),#1
+                      pg.image.load("images/RedKoopaTroopaR0.png"),#2
+                      pg.image.load("images/RedKoopaTroopaR1.png"),#3
+                      pg.image.load("images/RedKoopaParatroopaL0.png"),#4
+                      pg.image.load("images/RedKoopaParatroopaL1.png"),#5
+                      pg.image.load("images/RedKoopaTroopashell.png")]#6
+        super().__init__(self.frame[0] ,x, y, object_group)
+        self.default_y = y
+        self.time = 0
+        self.status = 3
+        self.direct_y = 1
+        self.are_get_edge = False
+    def change_image(self,img):
+        bottomleft = self.rect.bottomleft
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.bottomleft = bottomleft
+
+    def animation(self):
+        self.time += 1
+        if self.time >= 20 :
+            self.time = 0
+        if self.status == 3:
+            sl = 0 if self.direct == -1 else 2
+            self.image = self.frame[int(self.time/10)+sl]
+        
+        elif self.status == 4 : 
+            self.image = self.frame[int(self.time/10)+4]
+        elif self.status == 1 or self.status == 2 :
+            self.change_image(self.frame[6])
+    
+    def move_x(self):
+        if self.status == 3 :
+            
+            self.velocity_x = 1
+                   
+            if (self.rect.right <= self.edge_left or self.rect.left >= self.edge_right) and self.are_get_edge:
+                self.direct *= -1
+                self.rect.x += self.velocity_x*self.direct
+            
+            self.rect.x += self.velocity_x *self.direct
+
+        elif self.status == 4 or self.status == 2:
+            self.velocity_x = 0
+
+        elif self.status == 1 :
+            self.velocity_x = 7
+            self.rect.x += self.velocity_x* self.direct
+             
+    def move_y(self):
+        if self.status == 4 :
+            if (self.rect.y >= self.default_y+132)  or (self.rect.y <= self.default_y-132) :
+                self.direct_y *= -1            
+            self.velocity_y = 1
+            self.rect.y += self.velocity_y*self.direct_y
+    
+    def checkcollide(self):
+        for object in self.object_group : 
+            if self.rect.colliderect(object.rect)  and object is not self:
+                if self.status == 1 :
+                    if isinstance(object,(Mario,enemy)):
+                        if isinstance(object,enemy):
+                            over(object)
+                    if isinstance(object,terrain):
+                        if top_to(self,object):
+                            self.velocity_y = 0
+                            self.on_ground = True
+                            self.edge_left = getEdgeL(object)
+                            self.edge_right = getEdgeR(object)
+                        elif left_to(self,object) or right_to(self,object):
+                            self.direct *= -1
+                            self.velocity_x*=self.direct
+                            self.rect.x += self.velocity_x
+                        
+                elif self.status == 2 :
+                    if isinstance(object,Mario):
+                        if self.rect.centerx < object.rect.centerx :
+                            self.direct = -1                            
+                        else :
+                            self.direct = 1
+                        self.velocity_x = 5*self.direct
+                        self.rect.x += self.velocity_x
+                        self.status = 1
+
+                elif self.status == 3:
+                    if isinstance(object,terrain):
+                        if top_to(self,object):
+                            self.on_ground = True
+                            self.velocity_y = 0
+                            self.rect.bottom = object.rect.top
+                            self.edge_left = getEdgeL(object)
+                            self.edge_right = getEdgeR(object)
+                            self.are_get_edge = True
+                            
+                        elif left_to(self,object) or right_to(self,object):
+                            self.direct *= -1
+                            self.velocity_x*=self.direct
+                            self.rect.x = self.velocity_x
+                    if isinstance(object,enemy):
+                        self.direct *= -1
+                        self.velocity_x*=self.direct
+                        self.rect.x += self.velocity_x
+                        object.direct *= -1
+                        object.rect.x += object.direct
+                elif self.status == 4:
+                    if isinstance(object,terrain):
+                        self.direct_y *= -1
+                        self.rect.y += self.velocity_y*self.direct_y
+                    if isinstance(object,Mario):
+                        self.status = 3
+                        self.velocity_y = 0
+                        
+    def update(self):
+       
+        self.move_y()
+        self.animation()
+        self.checkcollide()
+        if not self.status == 4:
+            fall(self)
+        
+        self.move_x()
+
+class redkoopaParatroopa(redkoopatroopa):
+    def __init__(self, x, y, object_group):
+        super().__init__(x, y, object_group)
+        self.status = 4
+
 class hammer(hit_box): # ok 
     def __init__(self, x, y, object_group):
         self.frame =[pg.image.load("images/Hammer0.gif"),
@@ -601,7 +1047,6 @@ class latiku(enemy):
             self.direct = 1
         if self.rect.x > self.default_x +100 :
             self.direct = -1
-
         self.velocity_x += self.direct*self.acceleration 
         
         self.rect.x += self.velocity_x
@@ -689,7 +1134,7 @@ class spiny_egg(enemy):
                         
 
             for object in self.object_group : 
-                if isinstance(object,floor):
+                if isinstance(object,terrain):
                     if self.rect.colliderect(object.rect):
                         if top_to(self,object):
                             self.status = 1
@@ -703,7 +1148,8 @@ class spiny_egg(enemy):
                                 self.direct = 1 if self.rect.x < self.landmark else -1
                         elif right_to(self,object) or left_to(self,object):
                             self.direct *= -1
-                            self.rect.x += self.direct
+                            self.velocity_x*=self.direct
+                            self.rect.x += self.velocity_x
                             
                         
     def update(self):
@@ -729,7 +1175,11 @@ class Mario(object):
                       pg.image.load("images/MarioWL2.png"),#8
                       pg.image.load("images/MarioWL3.png"),#9
                       pg.image.load("images/MarioSR.png"),#10
-                      pg.image.load("images/MarioSL.png"),]#11
+                      pg.image.load("images/MarioSL.png"),#11
+                      pg.image.load("images/Mario - Climb1.png"),#12
+                      pg.image.load("images/Mario - Climb2.png"),#13
+                     pg.image.load("images/Mario - Dead.png") ]
+        
         
         self.frame2 = [pg.image.load("images/SuperMarioR.png"),#0
                       pg.image.load("images/SuperMarioJR.png"),#1
@@ -742,7 +1192,9 @@ class Mario(object):
                       pg.image.load("images/SuperMarioWL2.png"),#8
                       pg.image.load("images/SuperMarioWL3.png"),#9
                       pg.image.load("images/SuperMarioSR.png"),#10
-                      pg.image.load("images/SuperMarioSL.png"),]#11
+                      pg.image.load("images/SuperMarioSL.png"),#11
+                      pg.image.load("images/Super Mario - Climb1.png"),#12
+                      pg.image.load("images/Super Mario - Climb2.png"),]#13
         
         self.frame3 = [pg.image.load("images/FieryMarioR.png"),#0
                       pg.image.load("images/FieryMarioJR.png"),#1
@@ -755,16 +1207,17 @@ class Mario(object):
                       pg.image.load("images/FieryMarioWL2.png"),#8
                       pg.image.load("images/FieryMarioWL3.png"),#9
                       pg.image.load("images/FieryMarioSR.png"),#10
-                      pg.image.load("images/FieryMarioSL.png"),]#11
+                      pg.image.load("images/FieryMarioSL.png"),#11
+                      pg.image.load("images/Fiery Mario - Climb1.png"),#12
+                      pg.image.load("images/Fiery Mario - Climb2.png"),]#13
         
         self.frame_change = [pg.image.load("images/Mario_between_changeR.png"),
                              pg.image.load("images/Mario_between_changeL.png")]
         self.frame = self.frame1
         super().__init__(self.frame[0],x,y,object_group)
         self.velocity_x = 0
-        self.power_jump = 8
-        self.are_going = False
-        self.status = 1 
+        self.power_jump = 7.2
+        self.status = 1
         self.direct = 1
         self.press_up = False
         self.can_press_up = True
@@ -772,8 +1225,12 @@ class Mario(object):
         self.jump_countdown = 0
 
         self.countdown_firebar = 10
-
-        self.status = 1
+        
+        self.coin = 0
+        self.lives = 3
+        self.score = 0
+        self.time_score_count = 0
+        self.last_score = 0
         #  of animation 
         self.time = 0
         self.current_time = 0
@@ -785,7 +1242,16 @@ class Mario(object):
         self.blink_time = 0
         self.time_limit_blink = 200
         self.downgrade = False
-    
+        self.being_pushed = False
+        self.time_over= 24000
+        self.countdown_skill_blink= 600
+        #for end
+        self.finish = False
+        self.time_end = 0  
+        self.end = False
+
+        self.map = 1
+   
     def jump(self):
         if (self.on_ground and self.jump_countdown <=0):  
             self.on_ground=False
@@ -798,6 +1264,7 @@ class Mario(object):
             self.velocity_x += self.gravity*direct
         if abs(self.velocity_x) <= 0.1:
             self.are_going = False
+            self.velocity_x = 0
             
         self.rect.x += self.velocity_x
  
@@ -810,7 +1277,8 @@ class Mario(object):
             return
         for object in self.object_group:
             if self.rect.colliderect(object.rect) and object is not self:
-                if isinstance(object,floor):
+                if isinstance(object,terrain):
+                    print(len(self.object_group))
                     if top_to(self,object)and not (left_to(self,object) or right_to(self,object)):
                         self.edge_left = getEdgeL(object) 
                         self.edge_right = getEdgeR(object) 
@@ -829,7 +1297,7 @@ class Mario(object):
                     elif bot_to(self,object) and not (left_to(self,object) or right_to(self,object)):
                         if isinstance(object,question_block):
                             object.create(self)
-                        else :
+                        elif isinstance(object,brick) :
                             if self.status == 1 :
                                 object.pop_up()
                             else :
@@ -837,26 +1305,36 @@ class Mario(object):
                                 
                         self.velocity_y = 0
                         self.rect.top = object.rect.bottom+1
-                        
-                if isinstance(object,enemy):
-                    if top_to(self,object) and not isinstance(object,spiny_egg):
-                        over(object)
-                        self.velocity_y= -3
-                        self.rect.bottom = object.rect.top
-                        print("giet dich")
-                    else :
-                        print("bi ha")
-                        if not (isinstance(object,koopatroopa) and object.status == 2):
-                            if self.status > 1:
-                                self.downGrade()
-                            else :
-                                over(self)
-                    
+                elif not self.blink:       
+                    if isinstance(object,enemy):
+                        if top_to(self,object) :
+                            if not isinstance(object,spiny_egg):
+                                self.velocity_y= -3
+                                self.rect.bottom = object.rect.top
 
+                                if object.status > 1 :
+                                    object.status -=1
+                                else :
+                                    over(object)
+                        else :
+                            if not (isinstance(object,(koopatroopa,redkoopatroopa)) and object.status == 2):
+                                if self.status > 1:
+                                    self.downGrade()
+                                else : 
+                                    over(self)
+
+                if isinstance(object,gold_flag) and not self.finish:
+                    self.finish = True
+                    self.rect.right = object.rect.right
+
+                            
+                            
+                    
                 if isinstance(object,(super_mushroom,fire_flower)):
-                    self.upgrade = True
                     object.kill()
-    
+                    if self.status < 3:
+                        self.upgrade = True
+                        
     def move_x(self):
         self.are_going = True
         if self.velocity_x < 3 and self.velocity_x > -3:
@@ -873,12 +1351,13 @@ class Mario(object):
   
     def animation(self):
         self.time+=1
-        if self.time >= 30 :
-            self.time = 0
+        
         if not self.on_ground :
             self.image = self.frame[1] if self.direct == 1 else self.frame[6]
         else:
             if self.are_going:
+                if self.time >= 30 :
+                    self.time = 0
                 if self.velocity_x > 0 and self.direct == -1 :
                     self.image = self.frame[10]
                 elif self.velocity_x < 0 and self.direct == 1:
@@ -904,6 +1383,21 @@ class Mario(object):
             
         if self.downgrade :
             self.downGrade()
+        
+        if self.lose:
+            try :
+                self.image = self.frame[14]
+            except :
+                self.image = self.frame[1]
+        
+        if self.finish and self.time_end < 60 :
+            if self.time >= 20 :
+                self.time = 0
+            self.image = self.frame[int(self.time//10)+12]
+
+        if self.end :
+            self.image = self.image.copy()
+            self.image.set_alpha(0)
             
     def change_image(self,img):
         bottomleft = self.rect.bottomleft
@@ -970,39 +1464,108 @@ class Mario(object):
             self.frame = self.frame3
             self.status = 3
             self.upgrade = False  
-             
+
+    def get_time_countdown_blink(self):
+        if self.countdown_skill_blink > 0 :
+            return str(self.countdown_skill_blink//60)
+        return "READDY"
+
+    def end_map(self):
+        if self.rect.bottom < y_floor -32 and self.time_end < 10:
+            self.rect.y +=1
+        else :
+            self.time_end += 1
+            if self.time_end == 60 :
+                self.velocity_y = -3
+            elif self.time_end > 60 and self.time_end< 200 :
+                self.rect.y += self.velocity_y
+                self.rect.x += 2
+                self.velocity_y += self.gravity
+                self.are_going = True
+                
+            elif self.time_end >= 200:
+                self.time_end = 0
+                self.finish = False
+                self.are_going = False
+                self.object_group.remove(self)
+                self.end = True
+                
+    def count_score(self):
+        
+        if self.time_score_count > 0 : 
+            self.score += self.last_score*2
+            return f"{self.last_score*2}"
+        else :
+            self.score += 100
+            return "100"
+        
+    def reset(self):
+        self.velocity_x = 0
+        self.velocity_y = 0
+        self.are_going = False
+        self.on_ground = True
+        self.direct = 1
+        self.blink = False
+        self.blink_time = 0
+        self.finish = False
+        self.end = False
+        self.time_end = 0
+        self.upgrade = False
+        self.downgrade = False
+
+        
     def update(self,keys):
+        if self.finish :
+            self.end_map()
+                       
+        else :
+            self.time_score_count -=1
+            self.countdown_skill_blink -=1
+            self.time_over -= 1
+            self.are_going= False
+            self.jump_countdown-=1
+            self.press_up = False
+            
+            if self.time_over <=0 :
+                over(self)
+            if not self.upgrade and not self.downgrade and not self.end: 
+                if keys[pg.K_RIGHT] and not keys[pg.K_LEFT]:
+                    self.direct = 1
+                    self.move_x()
+            
+                if keys[pg.K_LEFT] and not keys[pg.K_RIGHT]:
+                    self.direct = -1
+                    self.move_x()
 
-        self.jump_countdown-=1
-        self.press_up = False
-        
-        if not self.upgrade and not self.downgrade: 
-            if keys[pg.K_RIGHT] and not keys[pg.K_LEFT]:
-                self.direct = 1
-                self.move_x()
-        
-            if keys[pg.K_LEFT] and not keys[pg.K_RIGHT]:
-                self.direct = -1
-                self.move_x()
+                if keys[pg.K_UP]:
+                    self.press_up = True
+                    self.jump()
 
-            if keys[pg.K_UP]:
-                self.press_up = True
-                self.jump()
+                if keys[pg.K_c]:
+                    if self.status == 3 and self.countdown_firebar <= 0:
+                        self.countdown_firebar = 10
+                        if self.direct == 1 :
+                            firebar(self.rect.right,self.rect.centery,self.direct,self.object_group)
+                        else :
+                            firebar(self.rect.left,self.rect.centery,self.direct,self.object_group)
+                if keys[pg.K_v] and self.countdown_skill_blink <=0 :
+                    self.be_blink()
+                    self.countdown_skill_blink= 6000
+                
+                if keys[pg.K_f]  :
+                    self.velocity_y = -3
+                    
 
-            if keys[pg.K_c]:
-                if self.status == 3 and self.countdown_firebar <= 0:
-                    self.countdown_firebar = 10
-                    if self.direct == 1 :
-                        firebar(self.rect.right,self.rect.centery,self.direct,self.object_group)
-                    else :
-                        firebar(self.rect.left,self.rect.centery,self.direct,self.object_group)
-            fall(self)
-            self.slip()
-        if not self.blink:
-            self.check_collide()
+                if keys[pg.K_d]  :
+                    self.velocity_x = 50*self.direct    
+
+                fall(self)
+                self.slip()
+            
+        self.check_collide()
                
         self.animation()
-            
+    
 def top_to(self,object):
         if self.rect.top < object.rect.top and self.rect.bottom < object.rect.bottom and self.velocity_y > 0 and self.rect.bottom - object.rect.top <= self.velocity_y+1:
             return True
@@ -1014,12 +1577,12 @@ def bot_to(self,object):
             return False
         
 def left_to(self,object):
-        if self.rect.left < object.rect.left and self.rect.right < object.rect.right and abs(self.rect.right - object.rect.left) <= abs(self.velocity_x)+1 : 
+        if self.rect.left < object.rect.left and self.rect.right < object.rect.right and abs(self.rect.right - object.rect.left) <= abs(self.velocity_x)+1+abs(object.velocity_x) and self.velocity_x >0 : 
             return True
         return False
 
 def right_to(self,object):
-        if self.rect.left > object.rect.left and self.rect.right > object.rect.right and abs(self.rect.left - object.rect.right) <= abs(self.velocity_x)+1 :
+        if self.rect.left > object.rect.left and self.rect.right > object.rect.right and abs(self.rect.left - object.rect.right) <= abs(self.velocity_x)+1+abs(object.velocity_x) and self.velocity_x <0 :
             return True
         return False
 
@@ -1033,7 +1596,7 @@ def fall(self):
             self.velocity_ = 5
     else :
         self.velocity_y = 0
-    
+
 def over(self):
     if not self.lose :
         self.lose = True
@@ -1041,15 +1604,25 @@ def over(self):
         self.velocity_y =-3 if isinstance(self,Mario) else 0 
         self.velocity_x =0 
 
+        if not isinstance(self,Mario):
+            for object in self.object_group :
+                if isinstance(object,Mario):
+                    text = object.count_score()
+                    TextEntity(text,self.rect.x,self.rect.y,self.object_group)
+
 def getEdgeR(self):
         for object in self.object_group :
-            if isinstance(object,floor) and object.rect.left == self.rect.right and self.rect.y == object.rect.y:
+            if isinstance(object,terrain) and object.rect.left == self.rect.right and self.rect.y == object.rect.y:
                 return getEdgeR(object)
         return self.rect.right
 
 def getEdgeL(self):
         for object in self.object_group :
-            if isinstance(object,floor) and self.rect.left == object.rect.right and self.rect.y == object.rect.y:
+            if isinstance(object,terrain) and self.rect.left == object.rect.right and self.rect.y == object.rect.y:
                 return getEdgeL(object)
         return self.rect.left
     
+def create_multi_brick(quantity,x,y,object_grooup):
+    for i in range(0,quantity):
+        brick(x+i,y,object_grooup)
+
