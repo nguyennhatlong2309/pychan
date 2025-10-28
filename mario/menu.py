@@ -21,7 +21,7 @@ background_game_rect = background_game.get_rect(topleft=(0,0))
 font = pg.font.Font("fonts/PressStart2P-Regular (1).ttf", 16) 
 
 # --- Menu ---
-menu_items = ["Start", "Continue","Option", "High Score", "Exit"]
+menu_items = ["Start","Option", "High Score","Instruct","Exit"]
 selected = 0  # Lựa chọn hiện tại
 screen.blit(background_game, background_game_rect)
 def draw_menu():
@@ -58,8 +58,9 @@ while running:
                 if choice == "Start":
                     print("Start Game!")
                     core.run_game(screen)
-                elif choice == "Continue":
+                elif choice == "Instruct":
                     print("Continue Game!")
+                    core.game_over(screen)
                 elif choice == "High Score":
                     core.popup_highest()
                 elif choice == "Exit":

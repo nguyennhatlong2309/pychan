@@ -337,6 +337,7 @@ class static_coin(object):
         for object in self.object_group:
             if isinstance(object,Mario) :
                 if self.rect.colliderect(object.rect):
+                    object.coin += 1
                     self.kill()
                 
                 break
@@ -503,10 +504,9 @@ class question_block(brick):
         self.object_group.add(self)
 
     def createCoin(self):
-        # if self.stock > 0 :
-        #     self.stock -= 1
-            coin(self.rect.centerx,self.rect.y,self.object_group)
-            self.reset_position()
+        
+        coin(self.rect.centerx,self.rect.y,self.object_group)
+        self.reset_position()
 
     def createMushroom(self):
         super_mushroom(self,self.object_group)
@@ -521,6 +521,7 @@ class question_block(brick):
             self.stock -=1
             if self.award == 1:
                 self.createCoin()
+                object.coin += 1
             else : 
                 if object.status == 1:
                     self.createMushroom()
@@ -612,7 +613,7 @@ class hit_box(object):
     def checkcollide(self):
         for object in self.object_group:
             if isinstance(object,Mario):
-                if self.rect.colliderect(object.rect):
+                if self.rect.colliderect(object.rect) and not object.blink:
                     object.downGrade()
 
 class piranha_plant(hit_box):
@@ -1498,7 +1499,7 @@ class Mario(object):
         else :
             self.score += 100
             return "100"
-        
+
     def reset(self):
         self.velocity_x = 0
         self.velocity_y = 0
@@ -1512,12 +1513,32 @@ class Mario(object):
         self.time_end = 0
         self.upgrade = False
         self.downgrade = False
-
+  
+    def dead(self):
+        self.lose = False
+        self.rect.x = 50
+        self.rect.y = y_floor-50
+        self.velocity_x = 0
+        self.velocity_y = 0
+        self.are_going = False
+        self.on_ground = False
+        self.direct = 1
+        self.blink = False
+        self.finish = False
+        self.end = False
+        self.time_end = 0
+        self.upgrade = False
+        self.downgrade = False
+        self.lives -=1 
+        if self.lives  <= 0 :
+            self.end = True
         
     def update(self,keys):
+        if self.rect.y > y_floor + 64 :
+            self.dead()
+
         if self.finish :
-            self.end_map()
-                       
+            self.end_map()            
         else :
             self.time_score_count -=1
             self.countdown_skill_blink -=1
@@ -1528,37 +1549,36 @@ class Mario(object):
             
             if self.time_over <=0 :
                 over(self)
-            if not self.upgrade and not self.downgrade and not self.end: 
-                if keys[pg.K_RIGHT] and not keys[pg.K_LEFT]:
-                    self.direct = 1
-                    self.move_x()
-            
-                if keys[pg.K_LEFT] and not keys[pg.K_RIGHT]:
-                    self.direct = -1
-                    self.move_x()
-
-                if keys[pg.K_UP]:
-                    self.press_up = True
-                    self.jump()
-
-                if keys[pg.K_c]:
-                    if self.status == 3 and self.countdown_firebar <= 0:
-                        self.countdown_firebar = 10
-                        if self.direct == 1 :
-                            firebar(self.rect.right,self.rect.centery,self.direct,self.object_group)
-                        else :
-                            firebar(self.rect.left,self.rect.centery,self.direct,self.object_group)
-                if keys[pg.K_v] and self.countdown_skill_blink <=0 :
-                    self.be_blink()
-                    self.countdown_skill_blink= 6000
+            if not self.upgrade and not self.downgrade and not self.end : 
+                if not self.lose :
+                    if keys[pg.K_RIGHT] and not keys[pg.K_LEFT]:
+                        self.direct = 1
+                        self.move_x()
                 
-                if keys[pg.K_f]  :
-                    self.velocity_y = -3
+                    if keys[pg.K_LEFT] and not keys[pg.K_RIGHT]:
+                        self.direct = -1
+                        self.move_x()
+
+                    if keys[pg.K_UP]:
+                        self.press_up = True
+                        self.jump()
+
+                    if keys[pg.K_c]:
+                        if self.status == 3 and self.countdown_firebar <= 0:
+                            self.countdown_firebar = 10
+                            if self.direct == 1 :
+                                firebar(self.rect.right,self.rect.centery,self.direct,self.object_group)
+                            else :
+                                firebar(self.rect.left,self.rect.centery,self.direct,self.object_group)
+                    if keys[pg.K_v] and self.countdown_skill_blink <=0 :
+                        self.be_blink()
+                        self.countdown_skill_blink= 6000
+                 
+                    if keys[pg.K_f]  :
+                        self.velocity_y = -3
                     
-
-                if keys[pg.K_d]  :
-                    self.velocity_x = 50*self.direct    
-
+                    if keys[pg.K_d]  :
+                        self.velocity_x = 50*self.direct 
                 fall(self)
                 self.slip()
             

@@ -43,7 +43,6 @@ while running:
         lambda: str(mario.lives),
         lambda: mario.get_time_countdown_blink(),
         lambda: "300",
-        
     ] 
     
 
