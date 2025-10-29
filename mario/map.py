@@ -4,6 +4,7 @@ import game_assets as ga
 y_floor= 14*32
 
 def map1():
+    print("tao map 1")
     object_group = pg.sprite.Group()
 
     ga.bg("new_bg1",0,0,object_group)
@@ -59,8 +60,8 @@ def map1():
     for i in range(0,8):
         ga.brick(78+i,6,object_group)
     
-    ga.goomba(80*32,320,object_group)
-    ga.goomba(83*32,320,object_group)
+    ga.goomba(80*32,y_floor-(32*9),object_group)
+    ga.goomba(83*32,y_floor-(32*9),object_group)
 
     
     
@@ -150,8 +151,8 @@ def map1():
             if j != 8:
                 ga.block(183+i,13-j,object_group)      
             
-    ga.gold_flag(200*32-16,object_group)
-    ga.block(200,13,object_group)
+    ga.gold_flag(199*32,object_group)
+    ga.block(199,13,object_group)
 
     ga.castle(204*32,object_group)
 
@@ -174,10 +175,7 @@ def map2():
     ga.bg("new_bg4",0,0,object_group)
     ga.bg("new_bg4",1500,0,object_group)
 
-
-    ga.redkoopatroopa(15*32,y_floor-48,object_group)
-    ga.floor(16*32,0,y_floor,object_group)
-    ga.floor(16*32,0,y_floor+32,object_group)
+    
     
     ga.grass_terrace(19*32,y_floor-10,2,object_group)
     
@@ -272,7 +270,7 @@ def map2():
     ga.moving_flat(146*32,y_floor-(32*8),3,1,1,object_group).limit_possion_x = 128
     #===================================================================================
 
-    ga.floor(2000,146*32,y_floor-(32*1),object_group)
+    
     
 
     ga.block(156,12,object_group)
@@ -280,23 +278,56 @@ def map2():
 
     for i in range(0,6):
         for j in range(0,4):
-            ga.block(156+i,12-j,object_group)
+            ga.block(156+i,13-j,object_group)
 
     for i in range(0,4):
         for j in range(0,2):
-            ga.block(158+i,8-j,object_group)
+            ga.block(158+i,9-j,object_group)
 
     for i in range(0,2) :
         for j in range(0,2):
-            ga.block(160+i,6-j,object_group)
+            ga.block(160+i,7-j,object_group)
 
     
-    t=ga.gold_flag(171*32-16,object_group)
+    
+    ga.create_multi_brick(4,176,5,object_group)
+
+    ga.create_multi_brick(4,176,9,object_group)
+
+    ga.hammerBrother(180*32,y_floor-48,object_group)
+
+    ga.hammerBrother(179*32,y_floor-(32*5)-48,object_group)
+
+
+
+
+
+
+
+
+    for i in range(0,6):
+        for j in range(0,4):
+            ga.block(186+i,13-j,object_group)
+
+    for i in range(0,4):
+        for j in range(0,2):
+            ga.block(188+i,9-j,object_group)
+
+    for i in range(0,2) :
+        for j in range(0,2):
+            ga.block(190+i,7-j,object_group)
+
+    t=ga.gold_flag(210*32,object_group)
     t.rect.y-=32
-    ga.block(171,12,object_group)
+    ga.block(210,13,object_group)
+    ga.castle(215*32,object_group)
 
     
-        
+    ga.floor(16*32,0,y_floor,object_group)
+    ga.floor(16*32,0,y_floor+32,object_group)
+
+    ga.floor(3072,146*32,y_floor,object_group)
+    ga.floor(3072,146*32,y_floor+32,object_group)
 
 
 
@@ -344,12 +375,11 @@ def map2():
 
 def map3():
 
-    
 
     object_group = pg.sprite.Group()
     ga.bg("new_bg2",0,0,object_group)
     ga.bg("new_bg2",1500,0,object_group)
-    ga.floor(3008,0,y_floor,object_group)
+    
     ga.create_multi_brick(3,15,10,object_group)
 
     for i in range(0,5):
@@ -410,13 +440,13 @@ def map3():
     ga.goomba(85*32,y_floor-32,object_group)
     ga.create_multi_brick(4,94,6,object_group)
 
-    ga.floor(320,3136,y_floor,object_group)
+    
 
     ga.piranha_plant(106*32,y_floor-(32*4),object_group)
     ga.pipe(105*32,3,object_group)
     ga.goomba(104*32,y_floor-32,object_group)
 
-    ga.floor(31*32,32*111,y_floor,object_group)
+    
 
     ga.piranha_plant(119*32,y_floor-64,object_group)
     ga.pipe(118*32,1,object_group)
@@ -435,10 +465,10 @@ def map3():
 
     ga.koopatroopa(141*32,y_floor-48,object_group)
 
-    ga.floor(320,4640,y_floor,object_group)
+    
     ga.koopaParatroopa(155*32,y_floor-48,object_group)
 
-    ga.floor(32*90,158*32,y_floor,object_group)
+    
 
     for i in range(0,3):
         ga.block(158,13-i,object_group)
@@ -472,6 +502,20 @@ def map3():
 
     ga.castle(208*32,object_group)
 
+    ga.floor(3008,0,y_floor,object_group)
+    ga.floor(3008,0,y_floor+32,object_group)
+
+    ga.floor(320,3136,y_floor,object_group)
+    ga.floor(320,3136,y_floor+32,object_group)
+
+    ga.floor(31*32,32*111,y_floor,object_group)
+    ga.floor(31*32,32*111,y_floor+32,object_group)
+
+    ga.floor(320,4640,y_floor,object_group)
+    ga.floor(320,4640,y_floor+32,object_group)
+
+    ga.floor(32*90,158*32,y_floor,object_group)
+    ga.floor(32*90,158*32,y_floor+32,object_group)
 
 
     

@@ -1,6 +1,9 @@
 import pygame as pg
-from PIL import Image, ImageDraw, ImageFont
+import copy
+import map
 pg.init()
+from sounds import sound,theme
+
 y_floor = 32*14
 
 font = pg.font.Font("fonts/PressStart2P-Regular (1).ttf", 16)
@@ -38,17 +41,20 @@ class object(pg.sprite.Sprite):
         self.on_ground = False
         self.object_group = object_group
         self.object_group.add(self)  
-
+        
 class bg(object):
     def __init__(self, name_img, x, y, object_group):
         self.image = pg.image.load(f"images/{name_img}.png")
         super().__init__(self.image, x, y, object_group)
-        
+        self.default_x = x
     def update(self):
         for object in self.object_group :
             if isinstance(object,Mario):
                 if object.rect.x > self.rect.right +800 : 
                     self.rect.left = self.rect.right +self.image.get_width()
+
+    def replace(self):
+        self.rect.x = self.default_x
 
 class castle(object):
     def __init__(self, x, object_group):
@@ -262,6 +268,7 @@ class brick(floor):
         peace_brick(self.rect.left,self.rect.bottom,-1,self.object_group)
         peace_brick(self.rect.right,self.rect.top,1,self.object_group)
         peace_brick(self.rect.right,self.rect.bottom,1,self.object_group)
+        sound.defect_brick()
         self.kill()
         
     def fall(self):
@@ -337,6 +344,7 @@ class static_coin(object):
         for object in self.object_group:
             if isinstance(object,Mario) :
                 if self.rect.colliderect(object.rect):
+                    sound.coin()
                     object.coin += 1
                     self.kill()
                 
@@ -577,11 +585,6 @@ class goomba(enemy):
                        if not (isinstance(object,(koopatroopa,redkoopatroopa)) and object.status == 1):
                         object.direct *= -1
                    
-                        
-                       
-
-                
-
     def animation(self):
         if self.lose :
             self.change_image(self.frame[2])
@@ -591,14 +594,14 @@ class goomba(enemy):
                 self.time = 0
             self.image = self.frame[int(self.time/10)]
 
-
-    
     def move(self):
         self.velocity_x = 1
         self.velocity_x*=self.direct
         self.rect.x += self.velocity_x
         
     def update(self):
+        if self.rect.y > y_floor+32 :
+            self.kill()
         if not self.lose :
             self.checkcollide()
             self.move()
@@ -692,7 +695,7 @@ class koopatroopa(enemy): # ok
 
                     if self.status == 1:
                         if isinstance(object,Mario):
-                            if (left_to(self,object) or right_to(self,object)) and object.lose == False:
+                            if (left_to(self,object) or right_to(self,object)) and object.lose == False and not object.blink:
                                 if object.status > 1 :
                                     object.downGrade()
                                 else :
@@ -805,8 +808,8 @@ class hammerBrother(enemy):#ok
     def move_x(self):
         if abs(self.rect.x - self.default_x) > 100 :
             self.direct *= -1
-        self.velocity_x*=self.direct
-        self.rect.x += self.velocity_x 
+        
+        self.rect.x += self.velocity_x*self.direct
 
     def jump(self):
         self.count_down_jump += 1
@@ -892,21 +895,22 @@ class redkoopatroopa(enemy):
     
     def move_x(self):
         if self.status == 3 :
-            
-            self.velocity_x = 1
+            self.velocity_x = 1 if self.direct == 1 else -1
                    
             if (self.rect.right <= self.edge_left or self.rect.left >= self.edge_right) and self.are_get_edge:
                 self.direct *= -1
-                self.rect.x += self.velocity_x*self.direct
-            
-            self.rect.x += self.velocity_x *self.direct
+                self.velocity_x*= -1
+                self.rect.x += self.velocity_x
+                
+            self.rect.x += self.velocity_x
+
 
         elif self.status == 4 or self.status == 2:
             self.velocity_x = 0
 
         elif self.status == 1 :
-            self.velocity_x = 7
-            self.rect.x += self.velocity_x* self.direct
+            self.velocity_x = 7 if self.direct == 1 else -7
+            self.rect.x += self.velocity_x
              
     def move_y(self):
         if self.status == 4 :
@@ -930,8 +934,8 @@ class redkoopatroopa(enemy):
                             self.edge_right = getEdgeR(object)
                         elif left_to(self,object) or right_to(self,object):
                             self.direct *= -1
-                            self.velocity_x*=self.direct
-                            self.rect.x += self.velocity_x
+                            self.velocity_x*=-1
+                            self.rect.x +=self.velocity_x
                         
                 elif self.status == 2 :
                     if isinstance(object,Mario):
@@ -956,7 +960,7 @@ class redkoopatroopa(enemy):
                         elif left_to(self,object) or right_to(self,object):
                             self.direct *= -1
                             self.velocity_x*=self.direct
-                            self.rect.x = self.velocity_x
+                            self.rect.x += self.velocity_x
                     if isinstance(object,enemy):
                         self.direct *= -1
                         self.velocity_x*=self.direct
@@ -1111,7 +1115,7 @@ class spiny_egg(enemy):
         if not self.lose :
             
             for object in self.object_group : 
-                if isinstance(object,Mario):
+                if isinstance(object,Mario) and not object.blink:
                     self.landmark = object.rect.x
                     if self.rect.colliderect(object.rect):
                         over(object)
@@ -1234,30 +1238,38 @@ class Mario(object):
         self.last_score = 0
         #  of animation 
         self.time = 0
-        self.current_time = 0
-        self.begin_up_grade = 0
+        self.current_time = 0   
+        self.begin_up_grade = 0  # dem thoi gian bat dau nang cap 
         self.are_going = False
-        self.upgrade = False
+        self.upgrade = False # co dang nag cap hay khong 
         self.upgrade_time = 0
         self.blink = False
         self.blink_time = 0
         self.time_limit_blink = 200
         self.downgrade = False
         self.being_pushed = False
-        self.time_over= 24000
+        
+        self.time_wait_revive = 0
+
         self.countdown_skill_blink= 600
+
         #for end
         self.finish = False
         self.time_end = 0  
         self.end = False
-
         self.map = 1
-   
+        self.time_over= 24000
+        # for dead
+        self.dead = False
+        self.time_reload_buttlet = 0
+        self.quantity_bullet = 10
+    
     def jump(self):
         if (self.on_ground and self.jump_countdown <=0):  
             self.on_ground=False
             self.last_jump = self.current_time
             self.velocity_y =-self.power_jump
+            sound.jump()
 
     def slip(self):
         if not self.are_going and self.velocity_x!=0: 
@@ -1279,7 +1291,6 @@ class Mario(object):
         for object in self.object_group:
             if self.rect.colliderect(object.rect) and object is not self:
                 if isinstance(object,terrain):
-                    print(len(self.object_group))
                     if top_to(self,object)and not (left_to(self,object) or right_to(self,object)):
                         self.edge_left = getEdgeL(object) 
                         self.edge_right = getEdgeR(object) 
@@ -1333,6 +1344,7 @@ class Mario(object):
                     
                 if isinstance(object,(super_mushroom,fire_flower)):
                     object.kill()
+                    
                     if self.status < 3:
                         self.upgrade = True
                         
@@ -1395,11 +1407,11 @@ class Mario(object):
             if self.time >= 20 :
                 self.time = 0
             self.image = self.frame[int(self.time//10)+12]
-
-        if self.end :
+            
+        if self.time_end >= 200 :
             self.image = self.image.copy()
             self.image.set_alpha(0)
-            
+    
     def change_image(self,img):
         bottomleft = self.rect.bottomleft
         self.image = img
@@ -1419,6 +1431,7 @@ class Mario(object):
             self.image.set_alpha(255)
 
     def downGrade(self):
+        sound.downgrade()
         self.downgrade = True
         self.be_blink()
         if self.blink_time >= 40:
@@ -1428,6 +1441,7 @@ class Mario(object):
             self.frame = self.frame1
         
     def upGrade(self):
+        sound.upgrade()
         if self.status == 1 :
             direct = 0 if self.direct == 1 else 1
             image = self.frame2[0] if self.direct == 1 else self.frame2[5]
@@ -1472,6 +1486,7 @@ class Mario(object):
         return "READDY"
 
     def end_map(self):
+        
         if self.rect.bottom < y_floor -32 and self.time_end < 10:
             self.rect.y +=1
         else :
@@ -1479,18 +1494,24 @@ class Mario(object):
             if self.time_end == 60 :
                 self.velocity_y = -3
             elif self.time_end > 60 and self.time_end< 200 :
+                theme.stop()
+                sound.win()
                 self.rect.y += self.velocity_y
                 self.rect.x += 2
                 self.velocity_y += self.gravity
                 self.are_going = True
                 
             elif self.time_end >= 200:
-                self.time_end = 0
-                self.finish = False
-                self.are_going = False
-                self.object_group.remove(self)
-                self.end = True
-                
+                if self.time_over >= 0 : 
+                    self.time_over -= 60
+                    self.score += 50
+                else :
+                    self.time_end = 0
+                    self.finish = False
+                    self.are_going = False
+                    self.object_group.remove(self)
+                    self.end = True
+     
     def count_score(self):
         
         if self.time_score_count > 0 : 
@@ -1513,30 +1534,69 @@ class Mario(object):
         self.time_end = 0
         self.upgrade = False
         self.downgrade = False
-  
-    def dead(self):
+        self.time_over = 24000
+
+        theme.change_theme(1)
+        for object in self.object_group :
+            if isinstance(object,bg):
+                object.replace()
         self.lose = False
         self.rect.x = 50
-        self.rect.y = y_floor-50
-        self.velocity_x = 0
-        self.velocity_y = 0
-        self.are_going = False
-        self.on_ground = False
+        self.rect.bottom = y_floor
         self.direct = 1
-        self.blink = False
-        self.finish = False
-        self.end = False
-        self.time_end = 0
-        self.upgrade = False
-        self.downgrade = False
-        self.lives -=1 
-        if self.lives  <= 0 :
-            self.end = True
         
-    def update(self,keys):
-        if self.rect.y > y_floor + 64 :
-            self.dead()
+    def revive(self):
+        if self.lives > 0 :
+            theme.change_theme(0)
+            theme.change_theme(1)
+            self.lose = False
+            self.rect.x = 50
+            self.rect.bottom = y_floor
+            self.velocity_x = 0
+            self.velocity_y = 0
+            self.are_going = False
+            self.on_ground = False
+            self.direct = 1
+            self.blink = False
+            self.finish = False
+            self.end = False
+            self.time_end = 0
+            self.upgrade = False
+            self.downgrade = False
+            self.lives -=1 
+            if self.lives  <= 0 :
+                self.end = True
+            self.object_group.remove(self)
+            for sprite in self.object_group.sprites():
+                if sprite != self:
+                    sprite.kill()
+            if self.map == 1:
+                self.object_group = map.map1()
+            elif self.map == 2:
+                self.object_group = map.map2()
+            elif self.map == 3:
+                self.object_group = map.map3()
+            self.object_group.add(self)
+    
+    def reload_bullet(self):
+        self.time_reload_buttlet +=1
+        if self.time_reload_buttlet >= 300 :
+            self.time_reload_buttlet = 0
+            self.quantity_bullet += 1
+            if self.quantity_bullet >= 10 :
+                self.quantity_bullet = 10
 
+    def update(self,keys):
+        
+        if self.rect.y > y_floor+32 :
+            over(self)
+            self.time_wait_revive += 1
+            if self.time_wait_revive == 290:
+                self.dead = True
+            if self.time_wait_revive >= 300 :
+                
+                self.time_wait_revive = 0
+                self.revive()
         if self.finish :
             self.end_map()            
         else :
@@ -1563,9 +1623,12 @@ class Mario(object):
                         self.press_up = True
                         self.jump()
 
-                    if keys[pg.K_c]:
-                        if self.status == 3 and self.countdown_firebar <= 0:
-                            self.countdown_firebar = 10
+                    if keys[pg.K_c] :
+                        if self.status == 3 and self.countdown_firebar <= 0 and self.quantity_bullet > 0:
+                            self.quantity_bullet -= 1
+                            print(self.quantity_bullet)
+                            sound.firebar()
+                            self.countdown_firebar = 30
                             if self.direct == 1 :
                                 firebar(self.rect.right,self.rect.centery,self.direct,self.object_group)
                             else :
@@ -1581,9 +1644,8 @@ class Mario(object):
                         self.velocity_x = 50*self.direct 
                 fall(self)
                 self.slip()
-            
         self.check_collide()
-               
+        self.reload_bullet()  
         self.animation()
     
 def top_to(self,object):
@@ -1621,8 +1683,14 @@ def over(self):
     if not self.lose :
         self.lose = True
         self.on_ground = False
-        self.velocity_y =-3 if isinstance(self,Mario) else 0 
         self.velocity_x =0 
+        if isinstance(self,Mario):
+            theme.stop()
+            sound.dead()
+            self.velocity_y =-3
+        else:
+            sound.enemy()
+            self.velocity_y = 0 
 
         if not isinstance(self,Mario):
             for object in self.object_group :

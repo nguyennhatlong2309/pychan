@@ -5,7 +5,7 @@ import sys
 
 pg.init()
 
-object_group = map.map1()
+object_group = map.map3()
 velocity_y = 0
 gravity = 0.2   
 
@@ -15,7 +15,7 @@ clock = pg.time.Clock()
 
 mario = ga.Mario(450,200,object_group)
 
-plus = 2500
+plus = 5100
 running = True
 while running: 
     for event in pg.event.get():
